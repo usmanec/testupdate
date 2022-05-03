@@ -2,9 +2,10 @@ name: Android CI
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches: 
+      - main
+    tags:
+      - "v[0-9].[0-9].[0-9]"
 
 env:
   KEYSTORE_FILE: ${{ secrets.KEYSTORE_FILE }}
@@ -14,7 +15,7 @@ env:
 
 jobs:
   build:
-
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
@@ -40,5 +41,34 @@ jobs:
     - name: Upload APK
       uses: actions/upload-artifact@v3
       with:
-         name: app-release.apk
+         name: build
          path: app/build/outputs/apk/release/app-release.apk
+         
+  release:
+    name: Release APK
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download APK from build
+      uses: actions/download-artifact@v3
+      with:
+        name: build
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.run_number }}
+        release_name: ${{ github.event.repository.name }} v${{ github.run_number }}
+    - name: Upload Release APK
+      id: upload_release_asset
+      uses: actions/upload-release-asset@v1.0.1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: apk/app-debug.apk
+        asset_name: ${{ github.event.repository.name }}.apk
+        asset_content_type: application/vnd.android.package-archive
